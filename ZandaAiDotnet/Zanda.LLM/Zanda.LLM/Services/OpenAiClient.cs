@@ -50,5 +50,26 @@ namespace Zanda.LLM.Services
             };
 
         }
+
+        public async Task<string> GetStructuredCompletionAsync(string systemPrompt, string userMessage, string jsonSchema, string model = "gpt-4.1-mini")
+        {
+            var openAiClient = new ChatClient(model: model, apiKey: _settings.OpenAiApiKey);
+            List<ChatMessage> prompt = new()
+            {
+                new SystemChatMessage(systemPrompt),
+                new UserChatMessage(userMessage),
+            };
+
+            ChatCompletionOptions options = new()
+            {
+                ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                    jsonSchemaFormatName: "structured_output",
+                    jsonSchema: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes(jsonSchema)),
+                    jsonSchemaIsStrict: true)
+            };
+
+            ChatCompletion completion = await openAiClient.CompleteChatAsync(prompt, options);
+            return completion.Content[0].Text.Trim();
+        }
     }
 }

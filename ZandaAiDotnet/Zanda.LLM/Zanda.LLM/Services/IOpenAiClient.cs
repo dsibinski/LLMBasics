@@ -16,5 +16,12 @@ namespace Zanda.LLM.Services
             string previousResponseId = "",
             string model = "gpt-4.1-mini"
         );
+        
+        Task<string> GetStructuredCompletionAsync(
+            string systemPrompt,
+            string userMessage,
+            string jsonSchema,
+            string model = "gpt-4.1-mini"
+        );
     }
 }
