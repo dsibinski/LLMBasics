@@ -51,6 +51,7 @@ public class ChatCompletionsController : ControllerBase
         
         foreach(var userMessage in userMessages)
         {
+            _logger.LogInformation("--- NEXT TURN ---");
             _logger.LogInformation("User asks: {Question}", userMessage);
             
             // Format the conversation history
@@ -70,17 +71,102 @@ public class ChatCompletionsController : ControllerBase
             ConversationHistory = conversationHistory
         });
     }
-
+    
     private string BuildSystemPromptWithHistory(string conversationHistory)
     {
-        return @"You are Bizzy, a helpful assistant. 
+        return $"""
+               You are Bizzy, a helpful assistant. 
 
-IMPORTANT: You have access to the conversation history so far. Use this information to provide contextually relevant responses and remember details about the user from previous interactions.
+               IMPORTANT: You have access to the conversation history so far. Use this information to provide contextually relevant responses 
+               and remember details about the user from previous interactions.
 
-Conversation History:
-" + conversationHistory + @"
+               Conversation History:
+               {conversationHistory}
 
-Please respond naturally and reference previous parts of the conversation when appropriate.";
+               Please respond naturally and reference previous parts of the conversation when appropriate.
+               """;
+    }
+
+
+    [HttpPost("ConversationSummarizationHistory")]
+    public async Task<IActionResult> ConversationSummarizationHistory()
+    {
+        var conversationSummary = "";
+        var userMessages = new List<string>
+        {
+            "Hi! I'm Dawid and I work as a software developer for Zanda. What about you?",
+            "Great! And how are you today?",
+            "What do you know about me?"
+        };
+        
+        foreach(var userMessage in userMessages)
+        {
+            _logger.LogInformation("--- NEXT TURN ---");
+            _logger.LogInformation("User asks: {Question}", userMessage);
+            
+            var systemPrompt = CreateSystemPromptWithSummary(conversationSummary);
+            var llmAnswer = await _openAiClient.GetCompletionAsync(systemPrompt, userMessage);
+            _logger.LogInformation("LLM answers: {Answer}", llmAnswer);
+            
+            // Generate new summarization
+            conversationSummary = await GenerateConversationSummary(userMessage, llmAnswer, conversationSummary);
+        }
+
+        return Ok(new { 
+            Message = "Conversation completed with summarization tracking",
+            FinalSummary = conversationSummary
+        });
+    }
+    
+
+    private string CreateSystemPromptWithSummary(string conversationSummary)
+    {
+        if (string.IsNullOrEmpty(conversationSummary))
+        {
+            return """
+                   You are Bizzy, a helpful assistant who speaks naturally and remembers details about the user from previous interactions.
+
+                   Let's chat!
+                   """;
+        }
+
+        return $"""
+               You are Bizzy, a helpful assistant who speaks naturally and remembers details about the user from previous interactions.
+
+               Here is a summary of the conversation so far:
+               <conversation_summary>
+               {conversationSummary}
+               </conversation_summary>
+
+               Use this information to provide contextually relevant responses.
+
+               Let's chat!
+               """;
+    }
+
+    private async Task<string> GenerateConversationSummary(string userMessage, string assistantResponse, string previousSummary)
+    {
+        var summarizationPrompt = 
+            $"""
+              Please summarize the following conversation in a concise manner, incorporating the previous summary if available:
+
+              <previous_summary>{previousSummary ?? "No previous summary"}</previous_summary>
+              <current_turn> User: {userMessage}
+              Assistant: {assistantResponse} </current_turn>
+
+              Please create/update our conversation summary.
+            """;
+
+        try
+        {
+            var summary = await _openAiClient.GetCompletionAsync(summarizationPrompt, "Please create/update our conversation summary.");
+            return summary ?? "No conversation history";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating conversation summary");
+            return previousSummary; // Fallback to previous summary if generation fails
+        }
     }
     
 }
