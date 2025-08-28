@@ -1,4 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using OpenAI.Chat;
+using OpenAI.Responses;
+using Zanda.LLM.Models;
 
 namespace Zanda.LLM.Services
 {
@@ -22,6 +25,30 @@ namespace Zanda.LLM.Services
 
             ChatCompletion completion = await openAiClient.CompleteChatAsync(prompt);
             return completion.Content[0].Text.Trim();
+        }
+
+        #pragma warning disable OPENAI001
+        public async Task<ResponsesAnswer> GetResponseAsync(string systemPrompt, string userMessage, string previousResponseId = "", string model = "gpt-4.1-mini")
+        {
+            OpenAIResponseClient client = new(model: model, apiKey: _settings.OpenAiApiKey);
+            var responseOpt = new ResponseCreationOptions()
+            {
+                Instructions = systemPrompt,
+            };
+            
+            if (!string.IsNullOrWhiteSpace(previousResponseId))
+            {
+                responseOpt.PreviousResponseId = previousResponseId;
+            }
+            
+            OpenAIResponse response = await client.CreateResponseAsync(userMessage, responseOpt);
+            var responseText = response.GetOutputText();
+            return new ResponsesAnswer
+            {
+                ConversationId = response.Id,
+                Response = responseText
+            };
+
         }
     }
 }
