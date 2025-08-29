@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using OpenAI.Chat;
 using OpenAI.Responses;
 using Zanda.LLM.Models;
